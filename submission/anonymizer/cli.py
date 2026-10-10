@@ -17,11 +17,9 @@ from .validate import limpar_linhas, validar
 from .verificar import verificar_submissao
 
 
-def executar(pdf: Path, template: str, chamar_llm: Callable[[str], str],
-             submission_dir: Path, work_dir: Path,
-             usar_regras: bool = True, reparar: bool = True) -> dict:
-    """Corre o pipeline e escreve submission.txt, prompt.txt e o original."""
-    texto = extrair_texto_pdf(pdf)
+def processar(texto: str, template: str, chamar_llm: Callable[[str], str],
+              usar_regras: bool = True, reparar: bool = True) -> dict:
+    """Anonimiza o texto e devolve o resultado, sem escrever ficheiros."""
     if not texto.strip():
         raise ValueError("O PDF não tem texto extraível.")
 
@@ -39,6 +37,15 @@ def executar(pdf: Path, template: str, chamar_llm: Callable[[str], str],
     # 3. A validação compara sempre com o texto original.
     r = validar(texto, resposta)
     r["linhasReparadas"] = reparadas
+    return r
+
+
+def executar(pdf: Path, template: str, chamar_llm: Callable[[str], str],
+             submission_dir: Path, work_dir: Path,
+             usar_regras: bool = True, reparar: bool = True) -> dict:
+    """Corre o pipeline e escreve submission.txt, prompt.txt e o original."""
+    texto = extrair_texto_pdf(pdf)
+    r = processar(texto, template, chamar_llm, usar_regras, reparar)
 
     work_dir.mkdir(parents=True, exist_ok=True)
     (work_dir / "original.txt").write_text(r["original"] + "\n",
