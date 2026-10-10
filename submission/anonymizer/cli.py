@@ -11,18 +11,34 @@ from .config import (PDF_FILE, PROMPT_FILE, SUBMISSION_DIR, WORK_DIR,
                      load_config)
 from .extract import extrair_texto_pdf
 from .llm import LLMError, anonimizar, construir_prompt
-from .validate import validar
+from .reparar import reparar_texto
+from .rules import aplicar_regras
+from .validate import limpar_linhas, validar
+from .verificar import verificar_submissao
 
 
 def executar(pdf: Path, template: str, chamar_llm: Callable[[str], str],
-             submission_dir: Path, work_dir: Path) -> dict:
+             submission_dir: Path, work_dir: Path,
+             usar_regras: bool = True, reparar: bool = True) -> dict:
     """Corre o pipeline e escreve submission.txt, prompt.txt e o original."""
     texto = extrair_texto_pdf(pdf)
     if not texto.strip():
         raise ValueError("O PDF não tem texto extraível.")
 
-    resposta = chamar_llm(construir_prompt(template, texto))
+    # 1. As regras mascaram primeiro o que tem formato fixo; o LLM vê "*"
+    #    nesses sítios e trata do resto.
+    texto_llm = aplicar_regras(texto) if usar_regras else texto
+    resposta = chamar_llm(construir_prompt(template, texto_llm))
+
+    # 2. Se o LLM se enganou a contar asteriscos numa linha, corrige a
+    #    contagem (não muda o que foi mascarado).
+    reparadas = []
+    if reparar:
+        resposta, reparadas = reparar_texto(texto, resposta)
+
+    # 3. A validação compara sempre com o texto original.
     r = validar(texto, resposta)
+    r["linhasReparadas"] = reparadas
 
     work_dir.mkdir(parents=True, exist_ok=True)
     (work_dir / "original.txt").write_text(r["original"] + "\n",
@@ -31,6 +47,9 @@ def executar(pdf: Path, template: str, chamar_llm: Callable[[str], str],
                                                    encoding="utf-8")
     # prompt.txt = prompt exato usado, com o documento como {DOCUMENT}
     (submission_dir / "prompt.txt").write_text(template, encoding="utf-8")
+
+    r["problemas"] = verificar_submissao(submission_dir,
+                                         limpar_linhas(texto))
     return r
 
 
@@ -55,12 +74,20 @@ def imprimir_resumo(r: dict) -> None:
     print(f"Máscaras aplicadas: {r['totalMascaras']}")
     print(f"Linhas: {r['linhasSaida']} / {r['linhasOriginal']}")
     print(f"Estrutura: {estrutura}")
+    if r["linhasReparadas"]:
+        print(f"Contagem de asteriscos corrigida nas linhas "
+              f"{r['linhasReparadas']}")
     if r["linhasContagemErrada"]:
         print(f"AVISO: número de palavras diferente nas linhas "
               f"{r['linhasContagemErrada']}")
     print(f"Linhas alteradas: {len(r['linhasAlteradas'])}")
     for ln in r["linhasAlteradas"]:
         print(f"  {ln}")
+    print("\n=== Verificação da submissão ===")
+    for p in r["problemas"]:
+        print(f"FALHA: {p}")
+    print("OK" if not r["problemas"] else
+          f"{len(r['problemas'])} problema(s): não submeter assim")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -72,6 +99,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="Ficheiro do prompt (por omissão rewrite.txt)")
     parser.add_argument("--sem-revisao", action="store_true",
                         help="Não abre o diff no VS Code")
+    parser.add_argument("--sem-regras", action="store_true",
+                        help="Não aplica as regras de regex antes do LLM")
+    parser.add_argument("--sem-reparacao", action="store_true",
+                        help="Não corrige a contagem de asteriscos")
     args = parser.parse_args(argv)
 
     try:
@@ -89,7 +120,9 @@ def main(argv: list[str] | None = None) -> int:
           f"(prompt: {args.prompt.name})...")
     try:
         r = executar(args.pdf, template, lambda p: anonimizar(p, cfg),
-                     SUBMISSION_DIR, WORK_DIR)
+                     SUBMISSION_DIR, WORK_DIR,
+                     usar_regras=not args.sem_regras,
+                     reparar=not args.sem_reparacao)
     except (LLMError, ValueError) as e:
         print(f"Erro: {e}", file=sys.stderr)
         return 2
@@ -100,4 +133,4 @@ def main(argv: list[str] | None = None) -> int:
                        SUBMISSION_DIR / "submission.txt")
     print(f"\nGravado em: {SUBMISSION_DIR / 'submission.txt'} e "
           f"{SUBMISSION_DIR / 'prompt.txt'}")
-    return 0
+    return 1 if r["problemas"] else 0
