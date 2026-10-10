@@ -1,8 +1,12 @@
 """Chamada ao Gemini: recebe o prompt completo e devolve o texto.
 
-Repete o pedido com espera crescente em erros temporários (429, 5xx).
+Repete o pedido com espera crescente em erros temporários (429, 5xx) e
+guarda as respostas em cache, para não gastar quota a repetir o mesmo
+pedido.
 """
 
+import hashlib
+import json
 import random
 import time
 from typing import Callable
@@ -39,6 +43,18 @@ def extrair_texto(resp) -> str:
     )
 
 
+def chave_cache(prompt: str, cfg: Config) -> str:
+    """Identifica o pedido. Não inclui a chave da API."""
+    pedido = {
+        "model": cfg.model,
+        "prompt": prompt,
+        "temperature": cfg.temperature,
+        "max_output_tokens": cfg.max_output_tokens,
+    }
+    dados = json.dumps(pedido, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(dados.encode("utf-8")).hexdigest()
+
+
 def e_repetivel(erro: Exception) -> bool:
     if isinstance(erro, (ConnectionError, TimeoutError)):
         return True
@@ -71,6 +87,20 @@ def pedir_com_repeticao(client, prompt: str, cfg: Config,
 
 
 def anonimizar(prompt: str, cfg: Config, client=None,
-               sleep: Callable[[float], None] = time.sleep) -> str:
+               sleep: Callable[[float], None] = time.sleep,
+               usar_cache: bool = True) -> str:
+    chave = chave_cache(prompt, cfg)
+    ficheiro = cfg.cache_dir / f"{chave}.json"
+    if usar_cache and ficheiro.exists():
+        return json.loads(ficheiro.read_text(encoding="utf-8"))["text"]
+
     client = client or genai.Client(api_key=cfg.api_key)
-    return extrair_texto(pedir_com_repeticao(client, prompt, cfg, sleep))
+    texto = extrair_texto(pedir_com_repeticao(client, prompt, cfg, sleep))
+
+    if usar_cache:
+        cfg.cache_dir.mkdir(parents=True, exist_ok=True)
+        registo = {"model": cfg.model, "temperature": cfg.temperature,
+                   "pedido_sha256": chave, "text": texto}
+        ficheiro.write_text(json.dumps(registo, ensure_ascii=False),
+                            encoding="utf-8")
+    return texto
