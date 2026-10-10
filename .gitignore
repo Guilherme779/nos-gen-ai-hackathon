@@ -186,3 +186,9 @@ __pypackages__/
 
 # Projeto CodingBros: ficheiros gerados localmente
 saida/
+
+# Frontend (Untrace)
+# A regra lib/ acima (pacotes Python) apanharia frontend/src/lib
+!frontend/src/lib/
+# O projeto usa bun.lock; o npm install cria este ficheiro localmente
+frontend/package-lock.json

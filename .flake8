@@ -1,0 +1,3 @@
+[flake8]
+# O node_modules do frontend traz ficheiros .py de terceiros (ex.: flatted)
+extend-exclude = frontend/node_modules
