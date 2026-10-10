@@ -182,3 +182,7 @@ __pypackages__/
 
 # macOS Finder metadata
 .DS_Store
+
+
+# Projeto CodingBros: ficheiros gerados localmente
+saida/
