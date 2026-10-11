@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("pdf", type=Path, nargs="?", default=PDF_FILE,
                         help="PDF a anonimizar (por omissão o do desafio)")
     parser.add_argument("--prompt", type=Path, default=PROMPT_FILE,
-                        help="Ficheiro do prompt (por omissão rewrite.txt)")
+                        help="Ficheiro do prompt (por omissão prompt.txt)")
     parser.add_argument("--sem-revisao", action="store_true",
                         help="Não abre o diff no VS Code")
     parser.add_argument("--sem-regras", action="store_true",

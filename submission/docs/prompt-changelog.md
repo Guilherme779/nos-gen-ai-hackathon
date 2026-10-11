@@ -1,4 +1,4 @@
-# Histórico do prompt (`submission/prompts/rewrite.txt`)
+# Histórico do prompt (`submission/prompt.txt`)
 
 Uma linha por versão. Cada versão é um commit próprio.
 

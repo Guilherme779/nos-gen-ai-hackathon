@@ -12,7 +12,7 @@ feito por quem fez o trabalho, a partir da sua conta GitHub. Tudo entra em
 | Pessoa | Papel | Branch(es) | Ficheiros |
 |---|---|---|---|
 | A | Pipeline e integração | `feat/skeleton`, `feat/integracao`, `feat/submissao` | `config.py`, `extract.py`, `validate.py`, `llm.py` (versão inicial), `cli.py`, `anonimizar.py`, `requirements*.txt`, `pytest.ini`, `.gitignore`, `.env.example`, `submission.txt`, `prompt.txt` |
-| B | LLM e prompt | `feat/llm` | `llm.py` (repetição e cache), `prompts/rewrite.txt` (v3), `docs/prompt-changelog.md` |
+| B | LLM e prompt | `feat/llm` | `llm.py` (repetição e cache), `prompt.txt` (v3), `docs/prompt-changelog.md` |
 | C | Regras (regex) | `feat/rules` | `rules.py` e os seus testes |
 | D | Validação da saída | `feat/validacao` | `reparar.py`, `verificar.py` e os seus testes |
 | E | Documentação e pitch | `docs/documentacao` | `README.md`, `docs/plano-equipa.md`, `docs/politica.md`, `docs/arquitetura.md`, `docs/pitch.md` |

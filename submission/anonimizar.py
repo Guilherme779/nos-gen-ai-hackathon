@@ -5,8 +5,8 @@ Uso (a partir da raiz do repositório):
   python submission/anonimizar.py
   python submission/anonimizar.py --sem-revisao
 
-Fluxo: PDF (PyMuPDF) -> prompt (submission/prompts/rewrite.txt) ->
-Gemini -> limpeza e validação -> submission/submission.txt e prompt.txt
+Fluxo: PDF (PyMuPDF) -> prompt (submission/prompt.txt) ->
+Gemini -> limpeza e validação -> submission/submission.txt
 """
 
 import sys
