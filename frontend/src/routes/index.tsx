@@ -66,7 +66,7 @@ function Index() {
         </motion.section>
         <motion.section className="project-note" initial={reduced ? false : { opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: .3 }}><span className="note-star" aria-hidden="true">✳</span><div><h2>Faz o que ninguém Fez</h2><p>A CodingBros project for JunctionX Lisbon 2026. Text masking alone does not guarantee legal anonymity. Review results against the team’s policy.</p></div><a href="https://lisbon.hackjunction.com/assets/challenges/NOS%20-%20JunctionX%20Lisbon%202026.pdf" target="_blank" rel="noopener noreferrer">Official challenge brief <span aria-hidden="true">↗</span></a></motion.section>
       </main>
-      <motion.footer className="footer container" initial={reduced ? false : { opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .2 }} transition={{ duration: .3 }}><div><strong>Untrace</strong><span>Less exposure. More context.</span></div><p>JunctionX Lisbon 2026 · CodingBros<br />An independent project. Not an official NOS service.</p><a href="#home" aria-label="Back to top">↑</a></motion.footer>
+      <motion.footer className="footer container" initial={reduced ? false : { opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: .2 }} transition={{ duration: .3 }}><div><strong>Untrace</strong><span>Less exposure. More context.</span></div><p>JunctionX Lisbon 2026 · CodingBros<br />An independent project. Not an official NOS service.<br /><small>Intro: Luís R. Teixeira · NOS Cinemas</small></p><a href="#home" aria-label="Back to top">↑</a></motion.footer>
     </>
   );
 }

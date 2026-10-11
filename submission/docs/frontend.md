@@ -31,8 +31,11 @@ Testes do frontend: `npm test`.
 
 ## Notas
 
-- A versão original no Lovable tinha um vídeo de introdução feito a partir
-  de um trailer de terceiros. Não foi incluído neste repositório, por ser
-  público e ter licença open-source; a página abre diretamente.
+- Ao abrir, a página mostra uma vez por sessão um vídeo de introdução de
+  8 segundos (`src/assets/untrace-intro-8s.mp4`), feito a partir do trailer
+  "Cinemas NOS – Policy Trailer" de Luís R. Teixeira, sem som. Está
+  creditado no rodapé da página e os direitos são do autor. Pode ser
+  saltado ("Saltar") e desliga-se com `<IntroVideo enabled={false}>` em
+  `src/routes/__root.tsx`.
 - Nunca colocar chaves de API em variáveis `VITE_*`: vão para o navegador.
   A chave do Gemini fica só no `.env` do motor Python.
