@@ -14,6 +14,7 @@ Nunca escreve submission.txt. A chave da API fica no .env do servidor.
 
 import argparse
 import json
+import os
 import re
 import sys
 import threading
@@ -89,13 +90,19 @@ class Motor:
 
 
 def criar_handler(motor: Motor):
+    origens_permitidas = {
+        origem.strip().rstrip("/")
+        for origem in os.getenv("ALLOWED_ORIGINS", "").split(",")
+        if origem.strip()
+    }
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, formato, *args):
             pass  # sem registos de pedidos (podem conter nomes)
 
         def _cors(self):
             origem = self.headers.get("Origin", "")
-            if ORIGEM_LOCAL.match(origem):
+            if ORIGEM_LOCAL.fullmatch(origem) or origem in origens_permitidas:
                 self.send_header("Access-Control-Allow-Origin", origem)
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods",

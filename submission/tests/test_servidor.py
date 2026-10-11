@@ -83,6 +83,20 @@ def test_anonymize_documento_real(servidor):
     assert r["summary"]["masked_spans"] > 0
 
 
+def test_cors_producao_apenas_origem_configurada(servidor, monkeypatch):
+    origem = "https://untrace-hackathon.onrender.com"
+    monkeypatch.setenv("ALLOWED_ORIGINS", " " + origem + "/ ")
+    base = servidor(motor_pronto())
+    estado, cab, _ = pedir(base + "/api/anonymize", "OPTIONS",
+                           cabecalhos={"Origin": origem})
+    assert estado == 204
+    assert cab["Access-Control-Allow-Origin"] == origem
+    for outra in [origem + ".evil.com", "https://exemplo.com"]:
+        _, cab, _ = pedir(base + "/api/health",
+                          cabecalhos={"Origin": outra})
+        assert "Access-Control-Allow-Origin" not in cab
+
+
 def test_rejeita_nao_pdf(servidor):
     base = servidor(motor_pronto())
     estado, _, corpo = pedir(base + "/api/anonymize", "POST", b"ola",
