@@ -103,20 +103,52 @@ result in VS Code.
 
 ### The demo with a user interface (Untrace)
 
-Two terminals: the Python engine and the website.
+The website (`frontend/`) sends the PDF to the Python server
+(`submission/servidor.py`), which runs the same pipeline as
+`anonimizar.py`. It needs Node.js (or Bun) and two terminals.
 
-```bash
-python submission/servidor.py
-```
+1. **The engine**, at the repository root, with `.env` filled in:
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+   ```bash
+   python submission/servidor.py
+   ```
 
-Full steps (including the frontend's `.env.local`) in
-[`submission/docs/demo.md`](submission/docs/demo.md).
+   It should print `Servidor em http://127.0.0.1:8000 (motor: ready)`. If
+   it says `configuration_error`, the key or the model is missing from
+   `.env`.
+
+2. **The website**, in another terminal, in `frontend/`. The first time,
+   create `.env.local` from the example (on Windows PowerShell use
+   `Copy-Item .env.example .env.local` instead of `cp`):
+
+   ```bash
+   cp .env.example .env.local
+   npm install
+   npm run dev
+   ```
+
+3. **Open the address `npm run dev` prints.** The status should change to
+   "Engine connected". Choose `raw_data/document_to_anonymize.pdf` and click
+   "Anonymize document".
+
+4. **Review the result**: click any word to mask or unmask it. The text,
+   the counters and the download update; "Reset to engine result" goes back
+   to the engine's output.
+
+Good to know:
+
+- The server only accepts pages from `localhost` or `127.0.0.1` (CORS).
+  To publish the demo, add the website's address to `ALLOWED_ORIGINS` in
+  the engine's environment.
+- It runs one analysis at a time; while it runs, the status shows
+  "Engine busy".
+- Gemini responses are cached in `.cache/llm`: analysing the same document
+  again costs no quota and answers instantly, which helps on stage.
+- Limits: 10 MB and 40 pages per PDF.
+- Never put API keys in `VITE_*` variables: they end up in the browser.
+  The Gemini key only lives in the engine's `.env`.
+- If the website shows no animations, check that Windows "Animation
+  effects" is on: the site respects the system's reduced-motion setting.
 
 ### Tests
 
@@ -154,8 +186,31 @@ raw_data/document_to_anonymize.pdf
 
 In the challenge document, the rules catch 11 items (emails, phone numbers,
 tax number, social security number, Citizen Card, bank card) and the model
-handles the rest. More detail in
-[`submission/docs/arquitetura.md`](submission/docs/arquitetura.md).
+handles the rest.
+
+### Design decisions
+
+- **Prototype in n8n, solution in Python.** The n8n flow validated the idea
+  quickly. The graded solution is Python because the code is part of the
+  evaluation and must be readable, testable and runnable by anyone.
+- **Regex before the model.** A validated rule is exact and costs no quota.
+  The rules require a prefix, a grouping or the label next to the value, so
+  they don't mask by mistake: a false positive from a rule can't be undone.
+- **The model returns the rewritten document** ("rewrite" mode). It is the
+  most direct way to meet "the output is what the model returns". The prompt
+  states the policy in full and uses invented examples, never values from
+  the document.
+- **Repair the count, not the decision.** The model decides well *what* to
+  mask, but sometimes places too many or too few asterisks. The repair step
+  aligns the line with the original and only fixes the count.
+- **Gemini 3.1 Flash Lite, temperature 0.** The free tier allows 15
+  requests per minute and 500 per day, enough to iterate. Temperature 0
+  keeps answers as repeatable as possible, and the cache makes repeated
+  requests free.
+- **Optional manual validation.** The command opens a side-by-side
+  comparison in VS Code. Corrections are made in the prompt and the
+  pipeline is run again: `submission.txt` is never edited by hand, so it is
+  always the system's output.
 
 ### The interface and the server
 
@@ -169,23 +224,43 @@ browser (Untrace)  ──POST /api/anonymize (PDF)──▶  submission/servidor
   It handles one request at a time and only accepts pages from `localhost`
   or from the origins configured in `ALLOWED_ORIGINS`. The key stays on the
   server; the browser never sees it.
-- **`frontend/`** (Untrace, built with Lovable): upload the PDF, see the
-  original and the result side by side with the masked passages
-  highlighted, and download the text after its SHA-256 is verified.
-- **Manual review**: any word can be clicked to mask or unmask it, fixing
-  false positives and false negatives by hand. The text, the counters and
-  the download update. With no changes, the download is exactly the engine
-  output; with changes it is named `…-revisto.txt`. See
-  [`submission/docs/frontend.md`](submission/docs/frontend.md).
+- **`frontend/`** (Untrace, generated with Lovable; React with TanStack
+  Start and Vite): drop or choose a PDF (up to 10 MB), see the original and
+  the result side by side with the masked passages highlighted, and
+  download the text. Before showing or downloading anything, it checks that
+  the file is exactly what the engine returned (size, UTF-8 and SHA-256).
+  With no engine connected, it shows "Backend pending connection" and sends
+  nothing. The frontend is a demonstration: the graded solution is the
+  Python code in `submission/`.
+- **Manual review**: after the analysis, **any word** of the original or of
+  the result can be clicked to mask or unmask it. Unmasking fixes a false
+  positive (the engine hid something that identifies nobody); masking fixes
+  a false negative (something that identifies the person was left visible).
+  The text, the highlights, the counters and the download update at once;
+  words changed by hand are outlined, the page shows how many changes were
+  made, and "Reset to engine result" goes back to the engine's output. With
+  changes, the download is named `…-revisto.txt`; with none, it is still
+  exactly the engine output, verified by SHA-256. The review happens only in
+  the browser: it changes neither the engine nor `submission.txt`.
+- **Where the code is**: the review logic is in
+  [`frontend/src/lib/review.ts`](frontend/src/lib/review.ts) (pure
+  functions, tested in `frontend/src/test/review-utils.test.ts`); the
+  contract with the engine (`GET /api/health`, `POST /api/anonymize`) is in
+  [`frontend/src/lib/api.ts`](frontend/src/lib/api.ts) and described in
+  [`frontend/README.md`](frontend/README.md).
+- **Intro video**: the page plays an 8-second intro once per session
+  (`frontend/src/assets/untrace-intro-8s.mp4`), skippable with "Saltar".
+  It is turned off with `<IntroVideo enabled={false}>` in
+  `frontend/src/routes/__root.tsx`. Credits in
+  [section 12](#12-credits-and-license).
 
 ---
 
 ## 4. The anonymization rules
 
 The exact rules the model follows are in
-[`submission/prompt.txt`](submission/prompt.txt) itself (in Portuguese,
-like the document). The reasoning is in
-[`submission/docs/politica.md`](submission/docs/politica.md).
+[`submission/prompt.txt`](submission/prompt.txt) itself. This section
+explains the reasoning behind them.
 
 **The question that decides every case:** *"does this value, on its own or
 combined with the rest of the document, reveal who the person is?"* If yes,
@@ -236,23 +311,21 @@ they stay on their line, with names masked, and are never executed.
 
 ## 5. The prompt and how it evolved
 
-The prompt is written in Portuguese, in "rewrite" mode: the model returns
+The prompt works in "rewrite" mode: the model returns
 the whole document with the data masked. `submission/prompt.txt` is the
 single source: the program reads it directly, so it is always the exact
 prompt used.
 
-| Version | What changed | Why |
-|---|---|---|
-| **v1** | The prompt from the n8n prototype | Starting point; it still followed a more aggressive policy (hid ages, marital status, the full address) |
-| **v2** | The "prevent identification" policy, written out in full | Team decision (see [section 6](#6-our-journey)) |
-| **v3** | Invented examples instead of values from the document; word-count rule for addresses; employer example | v2 copied real data from the document (the doctor's name, phone number, date of birth, CVV), which tailors the prompt to a single document. And the model gave "Apt 45" a single `*` |
-| **v4** | Delimiters against instruction injection, decision examples, edge cases (religion, names vs. places), stricter output format | Prompt quality (graded separately) and robustness |
-| **v5** | Stronger defence (lines with commands stay in place, tags preserved, `n.º` treated as a label), unique roles and terms of office, batch codes | Attack cases and edge cases that v4 still let through |
+| Version | What changed | Why | Observed result |
+|---|---|---|---|
+| **v1** | The prompt from the n8n prototype | Starting point | It worked, but followed a more aggressive policy than the one we chose (hid ages, marital status, the full address) |
+| **v2** | The "prevent identification" policy, written out in full | Team decision (see [section 6](#6-our-journey)) | "Apt 45" got a single `*`; the employer wasn't masked |
+| **v3** | Invented examples instead of values from the document; "each word gets its own asterisk" rule for addresses; employer example; explicit counting rule | v2's examples copied real data from the document (the doctor's name, phone number, date of birth, CVV), which tailors the prompt to a single document | Address and employer masked; the model still sometimes miscounts asterisks, which the repair step fixes |
+| **v4** | Delimiters against instruction injection, decision examples, edge cases (religion, names vs. places), stricter output format | Prompt quality (graded separately) and robustness | Same result as v3 on the challenge document |
+| **v5** | Stronger defence (lines with commands stay in place, tags preserved, `n.º` treated as a label), unique roles and terms of office, batch codes | Attack cases and edge cases that v4 still let through | Output identical, line by line, to the submitted file |
 
-With every change we checked that the result on the challenge document was
-still correct: the v5 output is identical, line by line, to the submitted
-file. Detailed history in
-[`submission/docs/prompt-changelog.md`](submission/docs/prompt-changelog.md).
+Each version is its own commit, so the full text of every version can be
+seen in the history of `submission/prompt.txt`.
 
 ---
 
@@ -306,6 +379,12 @@ We spent the first part of the hackathon **deciding**, not coding:
 | C | Regex rules | after the skeleton |
 | D | Asterisk count repair and submission checks | after the skeleton |
 | E | Documentation and pitch | right away |
+
+Each role owned specific files, and pull requests were reviewed in a ring:
+A by E, B by A, C by B, D by C, E by D. The order of work was: A opens the
+skeleton PR; once merged, B, C and D work in parallel; then A wires their
+parts into the pipeline and generates the submission; E documents along the
+way and prepares the pitch.
 
 ### Phase 1 — Kick-off
 
@@ -454,6 +533,8 @@ their own branch, and every PR was merged with a merge commit.
 - **`submission.txt` is never edited by hand**: it is always generated by
   the pipeline. Manual review exists only in the interface and in the
   downloaded file.
+- **Commits credited to the right person**: everyone checked that
+  `git config user.email` matched their GitHub account before committing.
 - **Commit messages in English**, imperative and specific.
 
 ---
@@ -526,7 +607,7 @@ submission/
     resposta_api.py     JSON response for the interface
     cli.py              wires the steps together
   tests/                automated tests (no network)
-  docs/                 policy, architecture, plan, prompt, demo, pitch
+  docs/pitch.md         pitch script (2 minutes)
 frontend/               Untrace interface (React, built with Lovable)
 raw_data/               challenge document
 .env.example            environment variables (no values)
