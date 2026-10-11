@@ -417,3 +417,12 @@ h1 em { color:var(--mono-text); }
 .confirm-dialog { background:var(--mono-surface); color:var(--mono-text); border:1px solid var(--mono-line); }
 #toast { background:var(--mono-text); color:var(--mono-canvas); }
 @media(max-width:800px) { .header nav.mobile-open { background:var(--mono-surface); border-bottom:1px solid var(--mono-line); } }
+
+/* Manual review: every word of the result can be masked or unmasked */
+.document-pane .word { all:unset; cursor:pointer; border-radius:2px; }
+.document-pane .word:hover { outline:1px solid var(--brand-blue); }
+.document-pane .word:focus-visible { outline:2px solid var(--brand-blue); outline-offset:1px; }
+.document-pane .word.manual { outline:1px dashed var(--brand-blue); outline-offset:1px; }
+.review-note { margin-bottom:6px; }
+.review-bar { display:flex; align-items:center; gap:12px; margin:0 20px 10px; font-size:10px; color:var(--mono-text); }
+.review-bar .subtle-button { margin:0; }

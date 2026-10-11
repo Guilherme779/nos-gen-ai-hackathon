@@ -14,6 +14,27 @@ código Python em `submission/`. O frontend serve para demonstrar o sistema.
   ficheiro é exatamente o que o motor devolveu (tamanho, UTF-8 e SHA-256).
 - Sem motor ligado, mostra "Backend pending connection" e não envia nada.
 
+## Revisão manual (falsos positivos e falsos negativos)
+
+Depois da análise, **qualquer palavra** do original ou do resultado pode ser
+clicada para a mascarar ou desmascarar:
+
+- desmascarar corrige um falso positivo (o motor escondeu algo que não
+  identifica ninguém);
+- mascarar corrige um falso negativo (ficou visível algo que identifica a
+  pessoa).
+
+O texto anonimizado, os realces, os contadores e o download atualizam-se
+na hora. As palavras alteradas à mão ficam contornadas, a página mostra
+quantas alterações foram feitas e "Reset to engine result" volta ao
+resultado do motor. Com alterações, o download chama-se `…-revisto.txt`;
+sem alterações, continua a ser exatamente o resultado do motor (verificado
+por SHA-256). Esta revisão acontece só no navegador: não muda o motor nem
+o `submission/submission.txt`, que continua a ser gerado só pelo pipeline.
+
+A lógica está em [`frontend/src/lib/review.ts`](../../frontend/src/lib/review.ts)
+(funções puras, com testes em `frontend/src/test/review-utils.test.ts`).
+
 O contrato com o motor (`GET /api/health` e `POST /api/anonymize`) está em
 [`frontend/src/lib/api.ts`](../../frontend/src/lib/api.ts) e descrito no
 [`frontend/README.md`](../../frontend/README.md).

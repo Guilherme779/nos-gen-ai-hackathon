@@ -1,30 +1,56 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { RefreshCw, ShieldCheck, ArrowRight, Download, X } from 'lucide-react';
 import { api, backendConfigured, type AnalysisResult, type Health } from '@/lib/api';
 import { readDownload, textParts, validatePdf, validateSelection } from '@/lib/result-utils';
+import { buildReview, renderReview, resetWords, reviewedFilename, toggleWord, type Rendered, type Word } from '@/lib/review';
 import { XFileButton } from './xfile-button';
 
 function RenderText({ text, result, side }: { text: string; result: AnalysisResult; side: 'original' | 'anonymized' }) {
   return textParts(text, result.spans, side).map((part, i) => part.marked ? <mark key={i} title={part.category}>{part.text}</mark> : part.text);
 }
 
-function ResultView({ result, onClear }: { result: AnalysisResult; onClear: () => void }) {
+/** Every word is a toggle: masked words are highlighted, manual changes are outlined. */
+function ReviewText({ text, words, onToggle }: { text: string; words: Word[]; onToggle: (index: number) => void }) {
+  const parts: ReactNode[] = [];
+  const pattern = /\S+/g;
+  let last = 0;
+  let index = 0;
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const i = index++;
+    const word = words[i];
+    if (word) {
+      const changed = word.masked !== word.engineMasked;
+      const hint = word.masked ? `Masked${word.category ? ` · ${word.category}` : ''}${changed ? ' by you' : ''}. Click to unmask.` : `${changed ? 'Unmasked by you. ' : ''}Click to mask.`;
+      parts.push(<button key={i} type="button" className={`word${changed ? ' manual' : ''}`} aria-pressed={word.masked} title={hint} onClick={() => onToggle(i)}>{word.masked ? <mark>{match[0]}</mark> : match[0]}</button>);
+    } else parts.push(match[0]);
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return <>{parts}</>;
+}
+
+function ResultView({ result, words, rendered, onToggle, onReset, onClear }: { result: AnalysisResult; words: Word[] | null; rendered: Rendered | null; onToggle: (index: number) => void; onReset: () => void; onClear: () => void }) {
   const [view, setView] = useState('both');
   const [wrap, setWrap] = useState(true);
+  const summary = rendered?.summary ?? result.summary;
+  const changes = rendered?.changes ?? 0;
   const metrics = [
-    ['Masked passages', result.summary.masked_spans], ['Words replaced', result.summary.substitutions],
-    ['Reported categories', result.summary.categories?.length], ['Engine time', result.processing_ms == null ? null : `${(result.processing_ms / 1000).toFixed(1)} s`],
+    ['Masked passages', summary.masked_spans], ['Words replaced', summary.substitutions],
+    ['Reported categories', summary.categories?.length], ['Engine time', result.processing_ms == null ? null : `${(result.processing_ms / 1000).toFixed(1)} s`],
   ];
   return <div id="result-content">
     <div className="metrics" aria-label="Analysis summary from the engine">{metrics.map(([label, value]) => <div key={String(label)}><span>{label}</span><strong className={value == null ? 'unavailable' : ''}>{value ?? 'Not provided'}</strong></div>)}</div>
-    <div className="category-tags">{result.summary.categories?.map((c, i) => <span key={i}>{c}</span>)}</div>
+    <div className="category-tags">{summary.categories?.map((c, i) => <span key={i}>{c}</span>)}</div>
+    {words && <p className="annotation-note review-note">Click any word to mask or unmask it. Highlights, counts and the download update with your changes.</p>}
+    {changes > 0 && <div className="review-bar" role="status"><span>{changes} {changes === 1 ? 'change' : 'changes'} made by you</span><XFileButton className="subtle-button" onClick={onReset}>Reset to engine result</XFileButton></div>}
     <p className="annotation-note">{result.spans == null ? 'The engine did not provide change positions. The complete text is shown without inferred highlights or counts.' : result.spans.length === 0 ? 'The engine reported zero masked passages. This does not guarantee that the document contains no personal data.' : `Highlights match the positions reported by the engine.${result.summary.categories_complete ? '' : ' Some categories were not provided.'}`}</p>
     <div className="viewer-toolbar"><div className="view-switch" role="group" aria-label="Document view">{([['both', 'Side by side'], ['original', 'Original'], ['anonymized', 'Anonymized']] as const).map(([v, label]) => <XFileButton className="view-button" key={v} aria-pressed={view === v} onClick={() => setView(v)}>{label}</XFileButton>)}</div><label className="wrap-toggle"><input type="checkbox" checked={wrap} onChange={e => setWrap(e.target.checked)} />Wrap lines</label></div>
     <div id="document-viewer" className={`document-viewer${wrap ? '' : ' nowrap'}`} data-view={view}>
-      <section id="original-pane" className="document-pane"><div className="document-label"><span>ORIGINAL</span><span>{result.page_count == null ? 'Pages not provided' : `${result.page_count} ${result.page_count === 1 ? 'page' : 'pages'}`}</span></div><pre tabIndex={0} aria-label="Original text"><RenderText text={result.original_text} result={result} side="original" /></pre></section>
-      <section id="anonymized-pane" className="document-pane"><div className="document-label"><span>ANONYMIZED</span><span>TXT · UTF-8</span></div><pre tabIndex={0} aria-label="Anonymized text"><RenderText text={result.anonymized_text} result={result} side="anonymized" /></pre></section>
+      <section id="original-pane" className="document-pane"><div className="document-label"><span>ORIGINAL</span><span>{result.page_count == null ? 'Pages not provided' : `${result.page_count} ${result.page_count === 1 ? 'page' : 'pages'}`}</span></div><pre tabIndex={0} aria-label="Original text">{words ? <ReviewText text={result.original_text} words={words} onToggle={onToggle} /> : <RenderText text={result.original_text} result={result} side="original" />}</pre></section>
+      <section id="anonymized-pane" className="document-pane"><div className="document-label"><span>ANONYMIZED</span><span>TXT · UTF-8</span></div><pre tabIndex={0} aria-label="Anonymized text">{words && rendered ? <ReviewText text={rendered.text} words={words} onToggle={onToggle} /> : <RenderText text={result.anonymized_text} result={result} side="anonymized" />}</pre></section>
     </div>
     <XFileButton className="subtle-button" onClick={onClear}>Clear document and result</XFileButton>
   </div>;
@@ -40,6 +66,9 @@ export function Workspace() {
   const [phase, setPhase] = useState<'empty' | 'processing' | 'error' | 'success'>('empty');
   const [operationError, setOperationError] = useState('');
   const [completed, setCompleted] = useState<{ result: AnalysisResult; bytes: Uint8Array<ArrayBuffer> } | null>(null);
+  const [words, setWords] = useState<Word[] | null>(null);
+  const rendered = useMemo(() => (completed && words ? renderReview(completed.result, words) : null), [completed, words]);
+  const changes = rendered?.changes ?? 0;
   const [elapsed, setElapsed] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [toast, setToast] = useState('');
@@ -55,10 +84,13 @@ export function Workspace() {
   const download = () => {
     if (!completed) return;
     if (downloadUrl.current) URL.revokeObjectURL(downloadUrl.current);
-    downloadUrl.current = URL.createObjectURL(new Blob([completed.bytes], { type: 'text/plain;charset=utf-8' }));
+    // Without manual changes: the exact verified engine bytes. With changes: the reviewed text.
+    const bytes = rendered && changes > 0 ? new TextEncoder().encode(rendered.text) : completed.bytes;
+    const name = changes > 0 ? reviewedFilename(completed.result.download.filename) : completed.result.download.filename;
+    downloadUrl.current = URL.createObjectURL(new Blob([bytes], { type: 'text/plain;charset=utf-8' }));
     const link = document.createElement('a');
     link.href = downloadUrl.current;
-    link.download = completed.result.download.filename.replace(/[/\\\x00-\x1f]/g, '_') || 'anonymized-document.txt';
+    link.download = name.replace(/[/\\\x00-\x1f]/g, '_') || 'anonymized-document.txt';
     document.body.append(link); link.click(); link.remove(); setToast('Download started.');
   };
   const busy = phase === 'processing';
@@ -98,7 +130,7 @@ export function Workspace() {
     return () => { clearTimeout(timer); if (previous instanceof HTMLElement) previous.focus(); };
   }, [confirm]);
   const clear = () => {
-    ++selectionId.current; setFile(null); setFileError(''); setCompleted(null); setPhase('empty'); setOperationError('');
+    ++selectionId.current; setFile(null); setFileError(''); setCompleted(null); setWords(null); setPhase('empty'); setOperationError('');
     if (input.current) input.current.value = '';
   };
   const select = async (selected: File) => {
@@ -113,11 +145,11 @@ export function Workspace() {
     if (!file || !health || !ready || busy) return;
     const error = validateSelection(file, limit);
     if (error) { setFileError(error); return; }
-    setCompleted(null); setPhase('processing'); setOperationError('');
+    setCompleted(null); setWords(null); setPhase('processing'); setOperationError('');
     operationController.current = new AbortController();
-    try { const payload = await api.anonymize(file, health, operationController.current.signal); const validated = await readDownload(payload); setCompleted(validated); setPhase('success'); }
+    try { const payload = await api.anonymize(file, health, operationController.current.signal); const validated = await readDownload(payload); setCompleted(validated); setWords(buildReview(validated.result)); setPhase('success'); }
     catch (error) {
-      setCompleted(null); setPhase('error');
+      setCompleted(null); setWords(null); setPhase('error');
       setOperationError(error instanceof Error && error.name === 'AbortError' ? 'The request timed out. The engine may still be processing it. Check its status before trying again.' : error instanceof TypeError ? 'The server connection was interrupted. Your request may still be finishing.' : error instanceof Error ? error.message : 'The analysis could not be completed.');
     } finally { operationController.current = null; void refreshHealth(); }
   };
@@ -145,8 +177,8 @@ export function Workspace() {
       </section>
       <section className="result-panel" aria-labelledby="results-title" aria-busy={busy}>
         <div className="panel-header"><span className="step-number">02</span><h3 id="results-title">Review the result</h3><span className="result-state">{phase === 'empty' ? 'Not started' : phase === 'processing' ? 'Analyzing' : phase === 'success' ? 'Completed' : 'Not completed'}</span></div>
-        {phase === 'success' && completed ? <ResultView result={completed.result} onClear={() => setConfirm(true)} /> : <AnimatePresence mode="wait" initial={false}><motion.div key={phase} data-state-motion {...entrance}>{content}</motion.div></AnimatePresence>}
-        <div className="download-row"><div><strong>{completed ? 'Your result is ready to download' : 'Nothing to download yet'}</strong><p>{completed ? 'The exact engine output, unchanged by the interface.' : 'The result appears here when the analysis finishes.'}</p></div><XFileButton className="primary-button" disabled={!completed} onClick={download}><Download />Download .txt</XFileButton></div>
+        {phase === 'success' && completed ? <ResultView result={completed.result} words={words} rendered={rendered} onToggle={i => setWords(w => (w ? toggleWord(w, i) : w))} onReset={() => setWords(w => (w ? resetWords(w) : w))} onClear={() => setConfirm(true)} /> : <AnimatePresence mode="wait" initial={false}><motion.div key={phase} data-state-motion {...entrance}>{content}</motion.div></AnimatePresence>}
+        <div className="download-row"><div><strong>{!completed ? 'Nothing to download yet' : changes > 0 ? 'Your reviewed result is ready to download' : 'Your result is ready to download'}</strong><p>{!completed ? 'The result appears here when the analysis finishes.' : changes > 0 ? `Includes ${changes} ${changes === 1 ? 'change' : 'changes'} you made. The engine output itself is not modified.` : 'The exact engine output, unchanged by the interface.'}</p></div><XFileButton className="primary-button" disabled={!completed} onClick={download}><Download />Download .txt</XFileButton></div>
       </section>
     </div>
     {mounted && createPortal(<><AnimatePresence>{confirm && <motion.div className="confirm-overlay" {...entrance} onClick={e => { if (e.target === e.currentTarget) setConfirm(false); }}><div ref={dialog} className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-title" onKeyDown={e => { if (e.key === 'Escape') setConfirm(false); if (e.key === 'Tab') { const buttons = dialog.current?.querySelectorAll('button'); const first = buttons?.[0]; const last = buttons?.[buttons.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); } } }}><h3 id="clear-title">Clear document and result?</h3><p>This removes the selected PDF and result from this page. Download your result first if you want to keep it.</p><div className="confirm-actions"><XFileButton className="subtle-button" onClick={() => setConfirm(false)}>Keep document</XFileButton><XFileButton className="primary-button" onClick={() => { clear(); setConfirm(false); setToast('Document and result cleared from this page.'); }}>Clear document and result</XFileButton></div></div></motion.div>}</AnimatePresence>

@@ -41,6 +41,10 @@ submission/servidor.py (porta 8000)  ──▶  Gemini (chave no .env)
    `raw_data/document_to_anonymize.pdf` e carregar em
    "Anonymize document".
 
+4. Rever o resultado: clicar numa palavra para a mascarar ou desmascarar.
+   O texto, os contadores e o download atualizam-se; "Reset to engine
+   result" volta ao resultado do motor.
+
 ## Notas
 
 - O servidor só aceita pedidos de páginas em `localhost` ou `127.0.0.1`
