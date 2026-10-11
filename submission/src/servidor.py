@@ -1,9 +1,9 @@
 """
 Servidor HTTP local que liga o frontend Untrace ao anonimizador.
 
-Uso (a partir da raiz do repositório):
-  python submission/servidor.py
-  python submission/servidor.py --porta 8000
+Uso (a partir de submission/src):
+  python servidor.py
+  python servidor.py --porta 8000
 
 Endpoints (contrato em frontend/src/lib/api.ts):
   GET  /api/health     estado do motor
