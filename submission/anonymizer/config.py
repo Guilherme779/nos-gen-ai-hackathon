@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 REPO = Path(__file__).resolve().parents[2]
 SUBMISSION_DIR = REPO / "submission"
-PROMPT_FILE = SUBMISSION_DIR / "prompts" / "rewrite.txt"
+PROMPT_FILE = SUBMISSION_DIR / "prompt.txt"
 PDF_FILE = REPO / "raw_data" / "document_to_anonymize.pdf"
 WORK_DIR = REPO / "saida"
 PLACEHOLDER = "{DOCUMENT}"

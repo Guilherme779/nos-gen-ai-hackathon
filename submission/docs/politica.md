@@ -1,7 +1,7 @@
 # Política de anonimização
 
 As regras exatas que o modelo segue estão no prompt,
-[`submission/prompts/rewrite.txt`](../prompts/rewrite.txt). Este documento
+[`submission/prompt.txt`](../prompt.txt). Este documento
 explica o porquê dessas regras; não as repete, para não haver duas versões
 a manter.
 
