@@ -11,3 +11,12 @@ def extrair_texto_pdf(caminho: Path) -> str:
         for page in doc:
             texto += page.get_text()
     return texto
+
+
+def extrair_pdf_bytes(dados: bytes) -> tuple[str, int]:
+    """Texto e número de páginas de um PDF recebido em memória."""
+    texto = ""
+    with fitz.open(stream=dados, filetype="pdf") as doc:
+        for page in doc:
+            texto += page.get_text()
+        return texto, doc.page_count
